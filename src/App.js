@@ -1,24 +1,54 @@
 import "./App.css";
 import { useEffect, useState } from "react";
+import { Scale, Midi } from "@tonaljs/tonal";
 
 let midiIn = [];
 let midiOut = [];
 
+function scaleIterator(scaleDescriptor) {
+  const range = Scale.rangeOf(scaleDescriptor)("C3", "C7");
+  let index = 0;
+
+  return {
+    next: (inc = 1)=>{
+      index += inc;
+      return range[index];
+    },
+    prev: (inc = 1)=>{
+      index -= inc
+      return range[index];
+    },
+    current: ()=>{
+      return range[index];
+    },
+    hasNext: (inc = 1)=>{
+      return (index + inc) >= range.length;
+    },
+    hasPrev: (inc = 1)=>{
+      return index < inc;
+    }
+  };
+}
+
+const scale = scaleIterator("C minor");
+
 function App() {
-  const [centerNote, setCenterNote] = useState(40);
+  const [centerNote, setCenterNote] = useState(scale.current());
 
   useEffect(connect, []);
 
   const handleClick = (note) => {
     setCenterNote(note);
-    sendMidiMessage(midiOut[0], note, 1, 1);
+    sendMidiMessage(midiOut[0], Midi.toMidi(note), 1, 1);
   };
 
   return (
     <div>
-      <button onClick={() => handleClick(centerNote - 1)}>{"-1"}</button>
-      <button onClick={() => handleClick(centerNote)}>{centerNote}</button>
-      <button onClick={() => handleClick(centerNote + 1)}>{"+1"}</button>
+      <button disabled={scale.hasPrev(2)} onClick={() => handleClick(scale.prev(2))}>{"- 3rd"}</button>
+      <button disabled={scale.hasPrev()} onClick={() => handleClick(scale.prev())}>{"- 2nd"}</button>
+      <button onClick={() => handleClick(scale.current())}>{centerNote}</button>
+      <button disabled={scale.hasNext()} onClick={() => handleClick(scale.next())}>{"+ 2nd"}</button>
+      <button disabled={scale.hasNext(2)} onClick={() => handleClick(scale.next(2))}>{"+ 3rd"}</button>
     </div>
   );
 }
@@ -108,14 +138,10 @@ function midiMessageReceived(event) {
     const note = notesOn.get(pitch);
     if (note) {
       console.log(`🎵 pitch:${pitch}, duration:${timestamp - note} ms.`);
-      notesOn.delete(pitch);
     }
   } else if (cmd === NOTE_ON) {
     console.log(
       `🎧 from ${event.srcElement.name} note off: pitch:${pitch}, velocity: {velocity}`
     );
-
-    // One note can only be on at once.
-    notesOn.set(pitch, timestamp);
   }
 }
